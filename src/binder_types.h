@@ -50,6 +50,12 @@ typedef enum binder_feature_mask {
     BINDER_FEATURE_ALL            = 0x07ff  /* all */
 } BINDER_FEATURE_MASK;
 
+typedef enum binder_interface_type {
+    BINDER_INTERFACE_TYPE_UNKNOWN = 0,
+    BINDER_INTERFACE_TYPE_HIDL,
+    BINDER_INTERFACE_TYPE_AIDL,
+} BINDER_INTERFACE_TYPE;
+
 typedef struct binder_data_profile_config {
     gboolean use_data_profiles;
     guint default_profile_id;
