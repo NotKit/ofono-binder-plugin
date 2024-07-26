@@ -970,7 +970,12 @@ binder_sim_get_imsi_cb(
         /* getIMSIForAppResponse(RadioResponseInfo, string imsi); */
         if (resp == code) {
             if (error == RADIO_ERROR_NONE) {
-                const char* imsi = binder_read_hidl_string(args);
+                const char* imsi;
+                if (cbd->self->interface_aidl == RADIO_AIDL_INTERFACE_NONE) {
+                    imsi = binder_read_hidl_string(args);
+                } else {
+                    imsi = binder_read_string16(args);
+                }
 
                 DBG_(cbd->self, "%s", imsi);
                 if (imsi) {

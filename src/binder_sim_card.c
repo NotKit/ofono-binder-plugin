@@ -730,14 +730,25 @@ binder_sim_card_new(
     self->g = radio_request_group_new(client); /* Keeps ref to client */
     self->interface_aidl = radio_client_aidl_interface(client);
 
-    self->event_id[EVENT_SIM_STATUS_CHANGED] =
-        radio_client_add_indication_handler(client,
-            RADIO_IND_SIM_STATUS_CHANGED,
-            binder_sim_card_status_changed, self);
-    self->event_id[EVENT_UICC_SUBSCRIPTION_STATUS_CHANGED] =
-        radio_client_add_indication_handler(client,
-            RADIO_IND_SUBSCRIPTION_STATUS_CHANGED,
-            binder_sim_card_status_changed, self);
+    if (self->interface_aidl == RADIO_AIDL_INTERFACE_NONE) {
+        self->event_id[EVENT_SIM_STATUS_CHANGED] =
+            radio_client_add_indication_handler(client,
+                RADIO_IND_SIM_STATUS_CHANGED,
+                binder_sim_card_status_changed, self);
+        self->event_id[EVENT_UICC_SUBSCRIPTION_STATUS_CHANGED] =
+            radio_client_add_indication_handler(client,
+                RADIO_IND_SUBSCRIPTION_STATUS_CHANGED,
+                binder_sim_card_status_changed, self);
+    } else {
+        self->event_id[EVENT_SIM_STATUS_CHANGED] =
+            radio_client_add_indication_handler(client,
+                RADIO_SIM_IND_SIM_STATUS_CHANGED,
+                binder_sim_card_status_changed, self);
+        self->event_id[EVENT_UICC_SUBSCRIPTION_STATUS_CHANGED] =
+            radio_client_add_indication_handler(client,
+                RADIO_SIM_IND_SUBSCRIPTION_STATUS_CHANGED,
+                binder_sim_card_status_changed, self);
+    }
     binder_sim_card_get_status(self);
     return card;
 }
