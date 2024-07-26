@@ -23,6 +23,8 @@
 #include <radio_request.h>
 #include <radio_util.h>
 
+#include <radio_network_types.h>
+
 #include <gbinder_reader.h>
 #include <gbinder_writer.h>
 
@@ -635,6 +637,15 @@ binder_cell_info_list_1_5(
 
 static
 void
+binder_cell_info_list_aidl(
+    BinderCellInfo* self,
+    GBinderReader* reader)
+{
+    ofono_warn("binder_cell_info_list_aidl FIXME");
+}
+
+static
+void
 binder_cell_info_list_changed_1_0(
     RadioClient* client,
     RADIO_IND code,
@@ -711,6 +722,25 @@ binder_cell_info_list_changed_1_5(
 
 static
 void
+binder_cell_info_list_changed_aidl(
+    RadioClient* client,
+    RADIO_IND code,
+    const GBinderReader* args,
+    gpointer user_data)
+{
+    BinderCellInfo* self = THIS(user_data);
+
+    GASSERT(code == RADIO_NETWORK_IND_CELL_INFO_LIST);
+    if (self->enabled) {
+        GBinderReader reader;
+
+        gbinder_reader_copy(&reader, args);
+        binder_cell_info_list_aidl(self, &reader);
+    }
+}
+
+static
+void
 binder_cell_info_list_cb(
     RadioRequest* req,
     RADIO_TX_STATUS status,
@@ -731,22 +761,27 @@ binder_cell_info_list_cb(
                 GBinderReader reader;
 
                 gbinder_reader_copy(&reader, args);
-                switch (resp) {
-                case RADIO_RESP_GET_CELL_INFO_LIST:
-                    binder_cell_info_list_1_0(self, &reader);
-                    break;
-                case RADIO_RESP_GET_CELL_INFO_LIST_1_2:
-                    binder_cell_info_list_1_2(self, &reader);
-                    break;
-                case RADIO_RESP_GET_CELL_INFO_LIST_1_4:
-                    binder_cell_info_list_1_4(self, &reader);
-                    break;
-                case RADIO_RESP_GET_CELL_INFO_LIST_1_5:
-                    binder_cell_info_list_1_5(self, &reader);
-                    break;
-                default:
-                    ofono_warn("Unexpected getCellInfoList response %d", resp);
-                    break;
+                const RADIO_AIDL_INTERFACE iface_aidl = radio_client_aidl_interface(self->client);
+                if (iface_aidl == RADIO_AIDL_INTERFACE_NONE) {
+                    switch (resp) {
+                    case RADIO_RESP_GET_CELL_INFO_LIST:
+                        binder_cell_info_list_1_0(self, &reader);
+                        break;
+                    case RADIO_RESP_GET_CELL_INFO_LIST_1_2:
+                        binder_cell_info_list_1_2(self, &reader);
+                        break;
+                    case RADIO_RESP_GET_CELL_INFO_LIST_1_4:
+                        binder_cell_info_list_1_4(self, &reader);
+                        break;
+                    case RADIO_RESP_GET_CELL_INFO_LIST_1_5:
+                        binder_cell_info_list_1_5(self, &reader);
+                        break;
+                    default:
+                        ofono_warn("Unexpected getCellInfoList response %d", resp);
+                        break;
+                    }
+                } else {
+                    binder_cell_info_list_aidl(self, &reader);
                 }
             }
         } else {
@@ -766,6 +801,10 @@ binder_cell_info_set_rate_cb(
     gpointer user_data)
 {
     BinderCellInfo* self = THIS(user_data);
+    const RADIO_AIDL_INTERFACE iface_aidl = radio_client_aidl_interface(self->client);
+    guint32 code = iface_aidl == RADIO_NETWORK_INTERFACE ?
+            RADIO_NETWORK_RESP_SET_CELL_INFO_LIST_RATE :
+            RADIO_RESP_SET_CELL_INFO_LIST_RATE;
 
     DBG_(self, "");
     GASSERT(self->set_rate_req == req);
@@ -773,7 +812,7 @@ binder_cell_info_set_rate_cb(
     self->set_rate_req = NULL;
 
     if (status == RADIO_TX_STATUS_OK) {
-        if (resp == RADIO_RESP_SET_CELL_INFO_LIST_RATE) {
+        if (resp == code) {
             if (error != RADIO_ERROR_NONE) {
                 DBG_(self, "Failed to set cell info rate, error %d", error);
             }
@@ -809,9 +848,14 @@ void
 binder_cell_info_query(
     BinderCellInfo* self)
 {
+    const RADIO_AIDL_INTERFACE iface_aidl = radio_client_aidl_interface(self->client);
+    guint32 code = iface_aidl == RADIO_NETWORK_INTERFACE ?
+            RADIO_NETWORK_REQ_GET_CELL_INFO_LIST :
+            RADIO_REQ_GET_CELL_INFO_LIST;
+
     radio_request_drop(self->query_req);
     self->query_req = radio_request_new(self->client,
-        RADIO_REQ_GET_CELL_INFO_LIST, NULL,
+        code, NULL,
         binder_cell_info_list_cb, NULL, self);
     radio_request_set_retry(self->query_req, BINDER_RETRY_MS, MAX_RETRIES);
     radio_request_set_retry_func(self->query_req, binder_cell_info_retry);
@@ -824,10 +868,14 @@ binder_cell_info_set_rate(
     BinderCellInfo* self)
 {
     GBinderWriter writer;
+    const RADIO_AIDL_INTERFACE iface_aidl = radio_client_aidl_interface(self->client);
+    guint32 code = iface_aidl == RADIO_NETWORK_INTERFACE ?
+            RADIO_NETWORK_REQ_SET_CELL_INFO_LIST_RATE :
+            RADIO_REQ_SET_CELL_INFO_LIST_RATE;
 
     radio_request_drop(self->set_rate_req);
     self->set_rate_req = radio_request_new(self->client,
-        RADIO_REQ_SET_CELL_INFO_LIST_RATE, &writer,
+        code, &writer,
         binder_cell_info_set_rate_cb, NULL, self);
 
     gbinder_writer_append_int32(&writer,
@@ -1010,24 +1058,33 @@ binder_cell_info_new(
     self->radio = binder_radio_ref(radio);
     self->sim_card = binder_sim_card_ref(sim);
     self->log_prefix = binder_dup_prefix(log_prefix);
+    const RADIO_AIDL_INTERFACE iface_aidl = radio_client_aidl_interface(self->client);
 
     DBG_(self, "");
-    self->event_id[CELL_INFO_EVENT_1_0] =
+    if (iface_aidl == RADIO_AIDL_INTERFACE_NONE) {
+        self->event_id[CELL_INFO_EVENT_1_0] =
         radio_client_add_indication_handler(client,
             RADIO_IND_CELL_INFO_LIST,
             binder_cell_info_list_changed_1_0, self);
-    self->event_id[CELL_INFO_EVENT_1_2] =
+        self->event_id[CELL_INFO_EVENT_1_2] =
         radio_client_add_indication_handler(client,
             RADIO_IND_CELL_INFO_LIST_1_2,
             binder_cell_info_list_changed_1_2, self);
-    self->event_id[CELL_INFO_EVENT_1_4] =
+        self->event_id[CELL_INFO_EVENT_1_4] =
         radio_client_add_indication_handler(client,
             RADIO_IND_CELL_INFO_LIST_1_4,
             binder_cell_info_list_changed_1_4, self);
-    self->event_id[CELL_INFO_EVENT_1_5] =
+        self->event_id[CELL_INFO_EVENT_1_5] =
         radio_client_add_indication_handler(client,
             RADIO_IND_CELL_INFO_LIST_1_5,
             binder_cell_info_list_changed_1_5, self);
+    } else {
+//FIXME naming
+        self->event_id[CELL_INFO_EVENT_1_0] =
+        radio_client_add_indication_handler(client,
+            RADIO_NETWORK_IND_CELL_INFO_LIST,
+            binder_cell_info_list_changed_aidl, self);
+    }
     self->radio_state_event_id =
         binder_radio_add_property_handler(radio,
             BINDER_RADIO_PROPERTY_STATE,
