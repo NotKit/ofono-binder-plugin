@@ -20,6 +20,9 @@
 #include <ofono/devinfo.h>
 #include <ofono/log.h>
 
+#include <radio_modem_types.h>
+
+#include <radio_client.h>
 #include <radio_request.h>
 #include <radio_request_group.h>
 
@@ -97,10 +100,16 @@ binder_devinfo_query_revision_ok(
     struct ofono_error err;
     GBinderReader reader;
     const char* res;
+    const RADIO_AIDL_INTERFACE iface_aidl = radio_client_aidl_interface(cbd->self->g->client);
 
     /* getBasebandVersionResponse(RadioResponseInfo, string version); */
     gbinder_reader_copy(&reader, args);
-    res = gbinder_reader_read_hidl_string_c(&reader);
+    if (iface_aidl == RADIO_AIDL_INTERFACE_NONE) {
+        res = gbinder_reader_read_hidl_string_c(&reader);
+    } else {
+        res = gbinder_reader_read_string16(&reader);
+    }
+
     DBG_(cbd->self, "%s", res);
     cbd->cb(binder_error_ok(&err), res ? res : "", cbd->data);
 }
@@ -117,9 +126,17 @@ binder_devinfo_query_revision_cb(
 {
     struct ofono_error err;
     const BinderDevInfoCbData* cbd = user_data;
+    const RADIO_AIDL_INTERFACE iface_aidl = radio_client_aidl_interface(cbd->self->g->client);
+    guint32 code = RADIO_RESP_NONE;
+
+    if (iface_aidl == RADIO_AIDL_INTERFACE_NONE) {
+        code = RADIO_RESP_GET_BASEBAND_VERSION;
+    } else {
+        code = RADIO_MODEM_RESP_GET_BASEBAND_VERSION;
+    }
 
     if (status == RADIO_TX_STATUS_OK) {
-        if (resp == RADIO_RESP_GET_BASEBAND_VERSION) {
+        if (resp == code) {
             if (error == RADIO_ERROR_NONE) {
                 binder_devinfo_query_revision_ok(cbd, args);
                 return;
@@ -141,8 +158,17 @@ binder_devinfo_query_revision(
     void* data)
 {
     BinderDevInfo* self = binder_devinfo_get_data(di);
+    const RADIO_AIDL_INTERFACE iface_aidl = radio_client_aidl_interface(self->g->client);
+    guint32 code = RADIO_RESP_NONE;
+
+    if (iface_aidl == RADIO_AIDL_INTERFACE_NONE) {
+        code = RADIO_REQ_GET_BASEBAND_VERSION;
+    } else if (iface_aidl == RADIO_MODEM_INTERFACE) {
+        code = RADIO_MODEM_REQ_GET_BASEBAND_VERSION;
+    }
+
     RadioRequest* req = radio_request_new2(self->g,
-        RADIO_REQ_GET_BASEBAND_VERSION, NULL,
+        code, NULL,
         binder_devinfo_query_revision_cb,
         binder_devinfo_callback_data_free,
         binder_devinfo_callback_data_new(self, cb, data));
