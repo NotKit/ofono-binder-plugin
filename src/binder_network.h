@@ -18,6 +18,8 @@
 
 #include "binder_types.h"
 
+#include <radio_network_types.h>
+
 #include <ofono/netreg.h>
 #include <ofono/radio-settings.h>
 

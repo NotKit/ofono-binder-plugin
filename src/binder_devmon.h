@@ -18,6 +18,7 @@
 
 #include "binder_types.h"
 #include <radio_modem_types.h>
+#include <radio_network_types.h>
 
 #include <ofono/slot.h>
 
