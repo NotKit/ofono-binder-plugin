@@ -1273,9 +1273,15 @@ binder_sim_enter_sim_pin_req(
     RadioRequest* req = radio_request_new2(self->g, code, &writer,
         complete, destroy, user_data);
 
-    binder_append_hidl_string(&writer, pin);
-    binder_append_hidl_string(&writer,
-        binder_sim_card_app_aid(self->card));
+    if (self->interface_aidl == RADIO_AIDL_INTERFACE_NONE) {
+        binder_append_hidl_string(&writer, pin);
+        binder_append_hidl_string(&writer,
+            binder_sim_card_app_aid(self->card));
+    } else {
+        gbinder_writer_append_string16(&writer, pin);
+        gbinder_writer_append_string16(&writer,
+            binder_sim_card_app_aid(self->card));
+    }
 
     radio_request_set_blocking(req, TRUE);
     return req;
