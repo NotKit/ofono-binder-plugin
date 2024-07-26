@@ -118,13 +118,21 @@ binder_devmon_ds_io_low_data_state_sent(
     gpointer user_data)
 {
     DevMonIo* self = user_data;
+    const RADIO_AIDL_INTERFACE iface_aidl = radio_client_aidl_interface(self->client);
+    guint32 code = RADIO_RESP_NONE;
 
     GASSERT(self->low_data_req == req);
     radio_request_unref(self->low_data_req);
     self->low_data_req = NULL;
 
+    if (iface_aidl == RADIO_AIDL_INTERFACE_NONE) {
+        code = RADIO_RESP_SEND_DEVICE_STATE;
+    } else if (iface_aidl == RADIO_MODEM_INTERFACE) {
+        code = RADIO_MODEM_RESP_SEND_DEVICE_STATE;
+    }
+
     if (status == RADIO_TX_STATUS_OK) {
-        if (resp == RADIO_RESP_SEND_DEVICE_STATE) {
+        if (resp == code) {
             if (error == RADIO_ERROR_REQUEST_NOT_SUPPORTED) {
                 DBG_(self, "LOW_DATA_EXPECTED state is not supported");
                 self->low_data_supported = FALSE;
@@ -147,13 +155,21 @@ binder_devmon_ds_io_charging_state_sent(
     gpointer user_data)
 {
     DevMonIo* self = user_data;
+    const RADIO_AIDL_INTERFACE iface_aidl = radio_client_aidl_interface(self->client);
+    guint32 code = RADIO_RESP_NONE;
 
     GASSERT(self->charging_req == req);
     radio_request_unref(self->charging_req);
     self->charging_req = NULL;
 
+    if (iface_aidl == RADIO_AIDL_INTERFACE_NONE) {
+        code = RADIO_RESP_SEND_DEVICE_STATE;
+    } else if (iface_aidl == RADIO_MODEM_INTERFACE) {
+        code = RADIO_MODEM_RESP_SEND_DEVICE_STATE;
+    }
+
     if (status == RADIO_TX_STATUS_OK) {
-        if (resp == RADIO_RESP_SEND_DEVICE_STATE) {
+        if (resp == code) {
             if (error == RADIO_ERROR_REQUEST_NOT_SUPPORTED) {
                 DBG_(self, "CHARGING state is not supported");
                 self->charging_supported = FALSE;
@@ -174,8 +190,23 @@ binder_devmon_ds_io_send_device_state(
     RadioRequestCompleteFunc callback)
 {
     GBinderWriter writer;
-    RadioRequest* req = radio_request_new(self->client,
-        RADIO_REQ_SEND_DEVICE_STATE, &writer, callback, NULL, self);
+    RadioRequest* req;
+    const RADIO_AIDL_INTERFACE iface_aidl = radio_client_aidl_interface(self->client);
+    guint32 code = RADIO_REQ_NONE;
+
+    if (iface_aidl == RADIO_AIDL_INTERFACE_NONE) {
+        code = RADIO_REQ_SEND_DEVICE_STATE;
+    } else if (iface_aidl == RADIO_MODEM_INTERFACE) {
+        code = RADIO_MODEM_REQ_SEND_DEVICE_STATE;
+    }
+
+//FIXME
+    if (code == RADIO_REQ_NONE) {
+        return NULL;
+    }
+
+    req = radio_request_new(self->client,
+        code, &writer, callback, NULL, self);
 
     /* sendDeviceState(int32_t serial, DeviceStateType type, bool state); */
     gbinder_writer_append_int32(&writer, type);

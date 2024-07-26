@@ -17,6 +17,7 @@
 #define BINDER_DEVMON_H
 
 #include "binder_types.h"
+#include <radio_modem_types.h>
 
 #include <ofono/slot.h>
 
