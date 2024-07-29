@@ -28,6 +28,8 @@
 #include <radio_request.h>
 #include <radio_request_group.h>
 
+#include <radio_modem_types.h>
+
 #include <gbinder_reader.h>
 #include <gbinder_writer.h>
 
@@ -362,6 +364,12 @@ binder_radio_caps_check_done(
     const RadioCapability* result = NULL;
 
     if (status == RADIO_TX_STATUS_OK) {
+/*
+        const RADIO_AIDL_INTERFACE iface_aidl = radio_client_aidl_interface(caps->g->client);
+        guint32 code = iface_aidl == RADIO_MODEM_INTERFACE ?
+            RADIO_MODEM_RESP_GET_RADIO_CAPABILITY :
+            RADIO_RESP_GET_RADIO_CAPABILITY;
+*/
         if (resp == RADIO_RESP_GET_RADIO_CAPABILITY) {
             if (error == RADIO_ERROR_NONE) {
                 result = binder_read_hidl_struct(args, RadioCapability);
@@ -412,10 +420,14 @@ binder_radio_caps_check(
     void* cb_data)
 {
     BinderRadioCapsCheckData* check = g_new0(BinderRadioCapsCheckData, 1);
+    const RADIO_AIDL_INTERFACE iface_aidl = radio_client_aidl_interface(client);
+    guint32 code = iface_aidl == RADIO_MODEM_INTERFACE ?
+        RADIO_MODEM_REQ_GET_RADIO_CAPABILITY :
+        RADIO_REQ_GET_RADIO_CAPABILITY;
 
     /* getRadioCapability(int32 serial) */
     RadioRequest* req = radio_request_new(client,
-        RADIO_REQ_GET_RADIO_CAPABILITY, NULL,
+        code, NULL,
         binder_radio_caps_check_done, g_free, check);
 
     check->cb = cb;
@@ -647,7 +659,11 @@ binder_radio_caps_initial_query_cb(
     const RadioCapability* cap = NULL;
 
     if (status == RADIO_TX_STATUS_OK) {
-        if (resp == RADIO_RESP_GET_RADIO_CAPABILITY) {
+        const RADIO_AIDL_INTERFACE iface_aidl = radio_client_aidl_interface(self->g->client);
+        guint32 code = iface_aidl == RADIO_MODEM_INTERFACE ?
+            RADIO_MODEM_RESP_GET_RADIO_CAPABILITY :
+            RADIO_RESP_GET_RADIO_CAPABILITY;
+        if (resp == code) {
             /* getRadioCapabilityResponse(RadioResponseInfo, RadioCapability) */
             if (error == RADIO_ERROR_NONE) {
                 cap = binder_read_hidl_struct(args, RadioCapability);
@@ -1159,7 +1175,11 @@ binder_radio_caps_manager_abort_cb(
     BinderRadioCapsManager* self = caps->pub.mgr;
 
     if (status == RADIO_TX_STATUS_OK) {
-        if (resp == RADIO_RESP_SET_RADIO_CAPABILITY) {
+        const RADIO_AIDL_INTERFACE iface_aidl = radio_client_aidl_interface(caps->g->client);
+        guint32 code = iface_aidl == RADIO_MODEM_INTERFACE ?
+            RADIO_MODEM_RESP_SET_RADIO_CAPABILITY :
+            RADIO_RESP_SET_RADIO_CAPABILITY;
+        if (resp == code) {
             if (error != RADIO_ERROR_NONE) {
                 DBG_(caps, "Failed to abort radio caps switch, error %s",
                     binder_radio_error_string(error));
@@ -1229,8 +1249,12 @@ void binder_radio_caps_manager_next_phase_cb(
 
     GASSERT(caps->tx_pending > 0);
     if (status == RADIO_TX_STATUS_OK) {
+        const RADIO_AIDL_INTERFACE iface_aidl = radio_client_aidl_interface(caps->g->client);
+        guint32 code = iface_aidl == RADIO_MODEM_INTERFACE ?
+            RADIO_MODEM_RESP_SET_RADIO_CAPABILITY :
+            RADIO_RESP_SET_RADIO_CAPABILITY;
         /* getRadioCapabilityResponse(RadioResponseInfo, RadioCapability rc) */
-        if (resp == RADIO_RESP_SET_RADIO_CAPABILITY) {
+        if (resp == code) {
             if (error == RADIO_ERROR_NONE) {
                 GBinderReader reader;
                 const RadioCapability* rc;
