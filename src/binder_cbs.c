@@ -180,6 +180,9 @@ binder_cbs_set_config(
     ofono_cbs_set_cb_t cb,
     void* data)
 {
+//FIXME HACK
+    return;
+
     /* setGsmBroadcastConfig(int32_t serial, vec<GsmBroadcastSmsConfigInfo>); */
     GBinderWriter writer;
     RadioRequest* req = radio_request_new2(self->g,
