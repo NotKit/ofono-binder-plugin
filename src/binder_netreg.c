@@ -771,6 +771,59 @@ binder_netreg_start_network_scan(
             gbinder_writer_append_struct(&writer, scan,
                 &radio_network_scan_request_1_5_t, NULL);
         }
+    } else {
+        /* Non-null parceable */
+        gint32 tsize = gbinder_writer_bytes_written(&writer);
+        DBG_(self, "bytes written to parcelable %d", tsize);
+        gbinder_writer_append_int32(&writer, 1);
+        gint32 initial_size = gbinder_writer_bytes_written(&writer);
+        DBG_(self, "bytes written to parcelable initial_size %d", initial_size);
+        /* Dummy parcelable size, replaced at the end */
+        gbinder_writer_append_int32(&writer, -1);
+        // type
+        gbinder_writer_append_int32(&writer, RADIO_SCAN_ONE_SHOT);
+        // interval
+        gbinder_writer_append_int32(&writer, 10);
+
+        /* Which modes are supported and enabled */
+        const BinderNetRegRadioType* radio_types[N_RADIO_TYPES_1_5];
+
+        for (i = 0; i < N_RADIO_TYPES_1_5; i++) {
+            if (self->techs & binder_netreg_radio_types_1_5[i].mode) {
+                radio_types[nspecs++] = binder_netreg_radio_types_1_5 + i;
+            }
+        }
+
+        // write specifier count
+        gbinder_writer_append_int32(&writer, nspecs);
+
+        // specifiers
+        for (i = 0; i < nspecs; i++) {
+            const BinderNetRegRadioType* radio_type = radio_types[i];
+            // Non-null parceable
+            gbinder_writer_append_int32(&writer, 1);
+            // parcelable size
+            gbinder_writer_append_int32(&writer, 4 * sizeof(gint32));
+            // accessNetwork
+            gbinder_writer_append_int32(&writer, radio_type->ran);
+            // bands (noinit)
+            gbinder_writer_append_int32(&writer, 0);
+            // channels count
+            gbinder_writer_append_int32(&writer, 0);
+        }
+
+        // maxSearchTime
+        gbinder_writer_append_int32(&writer, 60);
+        // incrementalResults
+        gbinder_writer_append_bool(&writer, TRUE);
+        // incrementalResultsPeriodicity
+        gbinder_writer_append_int32(&writer, 3);
+        // mccMncs count
+        gbinder_writer_append_int32(&writer, 0);
+        /* Parceable inner size + size of integer */
+        gint32 size = gbinder_writer_bytes_written(&writer);
+        DBG_(self, "bytes written to parcelable end %d diff %d", size, size - initial_size);
+        gbinder_writer_overwrite_int32(&writer, initial_size, size - initial_size);
     }
 
     /* Submit the request */
